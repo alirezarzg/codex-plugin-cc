@@ -882,6 +882,16 @@ test("task reads --sandbox only before the task text", () => {
   assert.equal(fakeState.lastThreadStart.sandbox, "danger-full-access");
   assert.equal(fakeState.lastTurnStart.model, "gpt-5.3-codex-spark");
   assert.equal(fakeState.lastTurnStart.prompt, "run the integration tests");
+
+  const quoted = run("node", [SCRIPT, "task", "--sandbox read-only '{\"key\":\"value\"}'"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(quoted.status, 0, quoted.stderr);
+  fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
+  assert.equal(fakeState.lastTurnStart.prompt, '{"key":"value"}');
 });
 
 test("task --sandbox rejects unknown modes and takes precedence over --write", () => {

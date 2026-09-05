@@ -856,10 +856,11 @@ async function handleReview(argv) {
 
 async function handleTask(argv) {
   const leading = extractLeadingSandbox(argv);
-  const { options, positionals } = parseCommandInput(leading.argv, {
+  const { options, positionals } = parseArgs(leading.argv, {
     valueOptions: TASK_VALUE_OPTIONS,
     booleanOptions: TASK_BOOLEAN_OPTIONS,
     aliasMap: {
+      C: "cwd",
       m: "model"
     }
   });
