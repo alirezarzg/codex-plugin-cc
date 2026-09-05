@@ -165,7 +165,7 @@ Ask Codex to redesign the database connection to be more resilient.
 - follow-up rescue requests can continue the latest Codex task in the repo
 - `--sandbox` applies to `/codex:rescue` only; `/codex:review` and `/codex:adversarial-review` stay read-only. It takes precedence over the rescue agent's default `--write`.
 - rescue runs edit files inside the repository by default (`workspace-write`). `--sandbox read-only` blocks edits, and `--sandbox danger-full-access` disables the Codex sandbox entirely, so Codex can write outside the repository and use the network without asking. Reserve it for tasks the sandbox blocks, such as running test tooling that writes to system locations.
-- a resumed thread keeps the sandbox it was started with. Passing `--sandbox` or `--write` together with `--resume` does not change it on current Codex releases (checked with 0.153.2). Start a new thread with `--fresh` to change the sandbox.
+- a resumed thread keeps the sandbox it was started with while the plugin's shared app-server still holds it, which is the normal case inside one Claude Code session: Codex CLI 0.153.2 applies the sandbox named on `thread/resume` only when it loads the thread again from disk. Start a new thread with `--fresh` to change the sandbox.
 
 ### `/codex:transfer`
 
