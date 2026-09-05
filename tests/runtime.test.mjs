@@ -931,6 +931,14 @@ test("task --sandbox rejects unknown modes and takes precedence over --write", (
     assert.match(empty.stderr, /Missing value for --sandbox/);
   }
 
+  const malformedBoolean = run("node", [SCRIPT, "task", "--write=false=x", "fix the failing test"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(malformedBoolean.status > 0, true);
+  assert.match(malformedBoolean.stderr, /Invalid value for --write: expected true or false/);
+
   const threads = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, "utf8")).threads : [];
   assert.equal(threads.length, 0);
 
@@ -940,9 +948,18 @@ test("task --sandbox rejects unknown modes and takes precedence over --write", (
   });
 
   assert.equal(explicit.status, 0, explicit.stderr);
-  const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  let fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
   assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
   assert.equal(fakeState.lastTurnStart.prompt, "fix the failing test");
+
+  const writeFalse = run("node", [SCRIPT, "task", "--write=false", "diagnose the failing test"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(writeFalse.status, 0, writeFalse.stderr);
+  fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
 });
 
 test("task --resume-last refuses a sandbox the app-server does not grant the resumed thread", () => {

@@ -38,7 +38,10 @@ export function parseArgs(argv, config = {}) {
       }
 
       if (booleanOptions.has(key)) {
-        options[key] = inlineValue === undefined ? true : inlineValue !== "false";
+        if (inlineValue !== undefined && inlineValue !== "true" && inlineValue !== "false") {
+          throw new Error(`Invalid value for --${rawKey}: expected true or false`);
+        }
+        options[key] = inlineValue !== "false";
         continue;
       }
 
