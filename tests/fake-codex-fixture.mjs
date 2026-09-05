@@ -363,12 +363,13 @@ rl.on("line", (line) => {
         }
         const thread = ensureThread(state, message.params.threadId);
         thread.updatedAt = now();
+        const resumedPolicy = BEHAVIOR === "external-sandbox" ? { type: "externalSandbox", networkAccess: "restricted" } : sandboxPolicy(thread.sandbox);
         state.lastThreadResume = {
           threadId: thread.id,
           sandbox: message.params.sandbox ?? null
         };
         saveState(state);
-        send({ id: message.id, result: { thread: buildThread(thread), model: message.params.model || "gpt-5.4", modelProvider: "openai", serviceTier: null, cwd: thread.cwd, approvalPolicy: "never", sandbox: sandboxPolicy(thread.sandbox), reasoningEffort: null } });
+        send({ id: message.id, result: { thread: buildThread(thread), model: message.params.model || "gpt-5.4", modelProvider: "openai", serviceTier: null, cwd: thread.cwd, approvalPolicy: "never", sandbox: resumedPolicy, reasoningEffort: null } });
         break;
       }
 

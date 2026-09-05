@@ -80,12 +80,19 @@ function assertResumedSandbox(threadId, requestedMode, response) {
     return;
   }
   const effectiveMode = sandboxModeForPolicy(response?.sandbox);
-  if (!effectiveMode || effectiveMode === requestedMode) {
+  if (effectiveMode === requestedMode) {
     return;
   }
+  if (effectiveMode) {
+    throw new Error(
+      `Thread ${threadId} still has sandbox ${effectiveMode} in the shared app-server, so this turn would not run ${requestedMode}. ` +
+        `Resume with --sandbox ${effectiveMode}, or start a fresh thread with --fresh.`
+    );
+  }
+  const reported = typeof response?.sandbox?.type === "string" ? response.sandbox.type : "none";
   throw new Error(
-    `Thread ${threadId} still has sandbox ${effectiveMode} in the shared app-server, so this turn would not run ${requestedMode}. ` +
-      `Resume with --sandbox ${effectiveMode}, or start a fresh thread with --fresh.`
+    `Thread ${threadId} reports a sandbox policy (${reported}) this plugin cannot compare with the requested ${requestedMode}. ` +
+      "Start a fresh thread with --fresh."
   );
 }
 

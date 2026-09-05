@@ -1052,6 +1052,35 @@ test("task-worker replays a stored request without a sandbox field using the --w
   assert.equal(fakeState.lastTurnStart.prompt, "fix the failing test");
 });
 
+test("task --resume-last refuses a resume when the app-server reports a sandbox policy it cannot compare", () => {
+  const repo = makeTempDir();
+  const binDir = makeTempDir();
+  const statePath = path.join(binDir, "fake-codex-state.json");
+  installFakeCodex(binDir, "external-sandbox");
+  initGitRepo(repo);
+  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
+  run("git", ["add", "README.md"], { cwd: repo });
+  run("git", ["commit", "-m", "init"], { cwd: repo });
+
+  const firstRun = run("node", [SCRIPT, "task", "initial task"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+  assert.equal(firstRun.status, 0, firstRun.stderr);
+
+  const resumed = run("node", [SCRIPT, "task", "--resume", "follow up"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(resumed.status > 0, true);
+  assert.match(resumed.stderr, /sandbox policy \(externalSandbox\) this plugin cannot compare with the requested read-only/);
+  assert.match(resumed.stderr, /--fresh/);
+  const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadResume.threadId, "thr_1");
+  assert.equal(fakeState.lastTurnStart.prompt, "initial task");
+});
+
 test("task --background stores the sandbox in the job request so the detached worker reuses it", async () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
