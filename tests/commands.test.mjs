@@ -116,6 +116,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(rescue, /`--model` and `--effort` are runtime-selection flags/i);
   assert.match(rescue, /`--sandbox` is a runtime-selection flag/i);
   assert.match(rescue, /Never add `--sandbox danger-full-access` yourself/i);
+  assert.match(rescue, /a `--sandbox` inside the task text stays where it is and is part of the prompt/i);
   assert.match(rescue, /Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort/i);
   assert.match(rescue, /If they ask for `spark`, map it to `gpt-5\.3-codex-spark`/i);
   assert.match(rescue, /If the request includes `--resume`, do not ask whether to continue/i);
@@ -139,7 +140,8 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(agent, /Leave model unset by default/i);
   assert.match(agent, /If the user asks for `spark`, map that to `--model gpt-5\.3-codex-spark`/i);
   assert.match(agent, /If the user asks for a concrete model name such as `gpt-5\.4-mini`, pass it through with `--model`/i);
-  assert.match(agent, /If the user passes `--sandbox <read-only\|workspace-write\|danger-full-access>`, forward it to `task` unchanged, before the task text, and do not add `--write`/i);
+  assert.match(agent, /If the user passes `--sandbox <read-only\|workspace-write\|danger-full-access>` before the task text, forward it to `task` in that position and do not add `--write`/i);
+  assert.match(agent, /A `--sandbox` inside the task text is part of the prompt: leave it there, and do not move it in front/i);
   assert.match(agent, /Never add `--sandbox danger-full-access` on your own/i);
   assert.match(agent, /Return the stdout of the `codex-companion` command exactly as-is/i);
   assert.match(agent, /If the Bash call fails or Codex cannot be invoked, return nothing/i);
@@ -156,7 +158,8 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(runtimeSkill, /If the forwarded request includes `--background` or `--wait`, treat that as Claude-side execution control only/i);
   assert.match(runtimeSkill, /Strip it before calling `task`/i);
   assert.match(runtimeSkill, /`--effort`: accepted values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`/i);
-  assert.match(runtimeSkill, /If the forwarded request includes `--sandbox`, pass it through to `task` before the task text and do not add `--write`/i);
+  assert.match(runtimeSkill, /If the forwarded request starts with `--sandbox` \(before the task text\), pass it through to `task` in that position and do not add `--write`/i);
+  assert.match(runtimeSkill, /A `--sandbox` inside the task text is prompt text; leave it in place/i);
   assert.match(runtimeSkill, /`--sandbox`: accepted values are `read-only`, `workspace-write`, `danger-full-access`/i);
   assert.match(runtimeSkill, /It takes precedence over `--write`/i);
   assert.match(runtimeSkill, /Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own/i);

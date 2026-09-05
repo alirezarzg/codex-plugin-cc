@@ -160,7 +160,9 @@ function extractLeadingSandbox(argv) {
   while (i < tokens.length) {
     const token = tokens[i];
     if (leading && token.startsWith("--") && token !== "--") {
-      const [key, inlineValue] = token.slice(2).split("=", 2);
+      const separator = token.indexOf("=");
+      const key = separator === -1 ? token.slice(2) : token.slice(2, separator);
+      const inlineValue = separator === -1 ? undefined : token.slice(separator + 1);
       if (key === "sandbox") {
         sandbox = inlineValue ?? tokens[i + 1] ?? "";
         i += inlineValue === undefined ? 2 : 1;

@@ -59,6 +59,36 @@ function cleanCodexStderr(stderr) {
     .join("\n");
 }
 
+const SANDBOX_POLICY_TYPES = new Map([
+  ["read-only", "readOnly"],
+  ["workspace-write", "workspaceWrite"],
+  ["danger-full-access", "dangerFullAccess"]
+]);
+
+function sandboxModeForPolicy(policy) {
+  const type = policy && typeof policy === "object" ? policy.type : null;
+  for (const [mode, policyType] of SANDBOX_POLICY_TYPES) {
+    if (policyType === type) {
+      return mode;
+    }
+  }
+  return null;
+}
+
+function assertResumedSandbox(threadId, requestedMode, response) {
+  if (!requestedMode || !SANDBOX_POLICY_TYPES.has(requestedMode)) {
+    return;
+  }
+  const effectiveMode = sandboxModeForPolicy(response?.sandbox);
+  if (!effectiveMode || effectiveMode === requestedMode) {
+    return;
+  }
+  throw new Error(
+    `Thread ${threadId} still has sandbox ${effectiveMode} in the shared app-server, so this turn would not run ${requestedMode}. ` +
+      `Resume with --sandbox ${effectiveMode}, or start a fresh thread with --fresh.`
+  );
+}
+
 /** @returns {ThreadStartParams} */
 function buildThreadParams(cwd, options = {}) {
   return {
@@ -1108,6 +1138,7 @@ export async function runAppServerTurn(cwd, options = {}) {
         sandbox: options.sandbox,
         ephemeral: false
       });
+      assertResumedSandbox(options.resumeThreadId, options.sandbox, response);
       threadId = response.thread.id;
     } else {
       emitProgress(options.onProgress, "Starting Codex task thread.", "starting");
