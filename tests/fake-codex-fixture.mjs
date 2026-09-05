@@ -315,10 +315,8 @@ rl.on("line", (line) => {
         const thread = nextThread(state, message.params.cwd, message.params.ephemeral);
         state.lastThreadStart = {
           threadId: thread.id,
-          model: message.params.model ?? null,
           sandbox: message.params.sandbox ?? null,
-          approvalPolicy: message.params.approvalPolicy ?? null,
-          ephemeral: Boolean(message.params.ephemeral)
+          approvalPolicy: message.params.approvalPolicy ?? null
         };
         saveState(state);
         send({ id: message.id, result: { thread: buildThread(thread), model: message.params.model || "gpt-5.4", modelProvider: "openai", serviceTier: null, cwd: thread.cwd, approvalPolicy: "never", sandbox: { type: "readOnly", access: { type: "fullAccess" }, networkAccess: false }, reasoningEffort: null } });
@@ -356,9 +354,7 @@ rl.on("line", (line) => {
         thread.updatedAt = now();
         state.lastThreadResume = {
           threadId: thread.id,
-          model: message.params.model ?? null,
-          sandbox: message.params.sandbox ?? null,
-          approvalPolicy: message.params.approvalPolicy ?? null
+          sandbox: message.params.sandbox ?? null
         };
         saveState(state);
         send({ id: message.id, result: { thread: buildThread(thread), model: message.params.model || "gpt-5.4", modelProvider: "openai", serviceTier: null, cwd: thread.cwd, approvalPolicy: "never", sandbox: { type: "readOnly", access: { type: "fullAccess" }, networkAccess: false }, reasoningEffort: null } });

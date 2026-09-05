@@ -801,11 +801,7 @@ async function handleTask(argv) {
   if (resumeLast && fresh) {
     throw new Error("Choose either --resume/--resume-last or --fresh.");
   }
-  const requestedSandbox = normalizeSandboxMode(options.sandbox);
-  if (options.write && requestedSandbox === "read-only") {
-    throw new Error("Choose either --write or --sandbox read-only.");
-  }
-  const sandbox = requestedSandbox ?? defaultTaskSandbox(Boolean(options.write));
+  const sandbox = normalizeSandboxMode(options.sandbox) ?? defaultTaskSandbox(Boolean(options.write));
   const write = sandbox !== "read-only";
   const taskMetadata = buildTaskRunMetadata({
     prompt,

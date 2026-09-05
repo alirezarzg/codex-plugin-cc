@@ -842,7 +842,7 @@ test("task --sandbox forwards the requested sandbox mode to thread/start", () =>
   assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
 });
 
-test("task --sandbox rejects unknown modes and a read-only sandbox combined with --write", () => {
+test("task --sandbox rejects unknown modes and takes precedence over --write", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
   const statePath = path.join(binDir, "fake-codex-state.json");
@@ -861,16 +861,18 @@ test("task --sandbox rejects unknown modes and a read-only sandbox combined with
   assert.match(unknown.stderr, /Unsupported sandbox mode "everything"/);
   assert.match(unknown.stderr, /read-only, workspace-write, danger-full-access/);
 
-  const conflict = run("node", [SCRIPT, "task", "--write", "--sandbox", "read-only", "fix the failing test"], {
+  const threads = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, "utf8")).threads : [];
+  assert.equal(threads.length, 0);
+
+  const explicit = run("node", [SCRIPT, "task", "--write", "--sandbox", "read-only", "fix the failing test"], {
     cwd: repo,
     env: buildEnv(binDir)
   });
 
-  assert.equal(conflict.status > 0, true);
-  assert.match(conflict.stderr, /Choose either --write or --sandbox read-only/);
-
-  const threads = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, "utf8")).threads : [];
-  assert.equal(threads.length, 0);
+  assert.equal(explicit.status, 0, explicit.stderr);
+  const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
+  assert.equal(fakeState.lastTurnStart.prompt, "fix the failing test");
 });
 
 test("task --resume-last forwards the sandbox of the new request on thread/resume", () => {

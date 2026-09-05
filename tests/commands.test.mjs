@@ -115,6 +115,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(rescue, /Do not forward them to `task`/i);
   assert.match(rescue, /`--model` and `--effort` are runtime-selection flags/i);
   assert.match(rescue, /`--sandbox` is a runtime-selection flag/i);
+  assert.match(rescue, /Never add `--sandbox danger-full-access` yourself/i);
   assert.match(rescue, /Leave `--effort` unset unless the user explicitly asks for a specific reasoning effort/i);
   assert.match(rescue, /If they ask for `spark`, map it to `gpt-5\.3-codex-spark`/i);
   assert.match(rescue, /If the request includes `--resume`, do not ask whether to continue/i);
@@ -157,6 +158,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(runtimeSkill, /`--effort`: accepted values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`/i);
   assert.match(runtimeSkill, /If the forwarded request includes `--sandbox`, pass it through to `task` and do not add `--write`/i);
   assert.match(runtimeSkill, /`--sandbox`: accepted values are `read-only`, `workspace-write`, `danger-full-access`/i);
+  assert.match(runtimeSkill, /It takes precedence over `--write`/i);
   assert.match(runtimeSkill, /Do not inspect the repository, read files, grep, monitor progress, poll status, fetch results, cancel jobs, summarize output, or do any follow-up work of your own/i);
   assert.match(runtimeSkill, /If the Bash call fails or Codex cannot be invoked, return nothing/i);
   assert.match(readme, /`codex:codex-rescue` subagent/i);
@@ -167,6 +169,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(readme, /--sandbox <read-only\|workspace-write\|danger-full-access>/);
   assert.match(readme, /`--sandbox danger-full-access` disables the Codex sandbox entirely/i);
   assert.match(readme, /a resumed thread keeps the sandbox it was started with/i);
+  assert.match(readme, /`--sandbox` applies to `\/codex:rescue` only/i);
   assert.match(readme, /### `\/codex:setup`/);
   assert.match(readme, /### `\/codex:review`/);
   assert.match(readme, /### `\/codex:adversarial-review`/);
