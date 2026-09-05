@@ -842,6 +842,48 @@ test("task --sandbox forwards the requested sandbox mode to thread/start", () =>
   assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
 });
 
+test("task reads --sandbox only before the task text", () => {
+  const repo = makeTempDir();
+  const binDir = makeTempDir();
+  const statePath = path.join(binDir, "fake-codex-state.json");
+  installFakeCodex(binDir);
+  initGitRepo(repo);
+  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
+  run("git", ["add", "README.md"], { cwd: repo });
+  run("git", ["commit", "-m", "init"], { cwd: repo });
+
+  const mentioned = run("node", [SCRIPT, "task", "explain how --sandbox danger-full-access works in this plugin"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(mentioned.status, 0, mentioned.stderr);
+  let fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
+  assert.equal(fakeState.lastTurnStart.prompt, "explain how --sandbox danger-full-access works in this plugin");
+
+  const splitTokens = run("node", [SCRIPT, "task", "document", "why", "--sandbox", "danger-full-access", "is", "off"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(splitTokens.status, 0, splitTokens.stderr);
+  fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "read-only");
+  assert.equal(fakeState.lastTurnStart.prompt, "document why --sandbox danger-full-access is off");
+
+  const leading = run("node", [SCRIPT, "task", "-m", "spark", "--sandbox=danger-full-access", "--write", "run the integration tests"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(leading.status, 0, leading.stderr);
+  fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "danger-full-access");
+  assert.equal(fakeState.lastTurnStart.model, "gpt-5.3-codex-spark");
+  assert.equal(fakeState.lastTurnStart.prompt, "run the integration tests");
+});
+
 test("task --sandbox rejects unknown modes and takes precedence over --write", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
@@ -875,7 +917,7 @@ test("task --sandbox rejects unknown modes and takes precedence over --write", (
   assert.equal(fakeState.lastTurnStart.prompt, "fix the failing test");
 });
 
-test("task --resume-last forwards the sandbox of the new request on thread/resume", () => {
+test("task --resume-last keeps the sandbox of the thread and refuses another one", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
   const statePath = path.join(binDir, "fake-codex-state.json");
@@ -907,10 +949,21 @@ test("task --resume-last forwards the sandbox of the new request on thread/resum
     env: buildEnv(binDir)
   });
 
-  assert.equal(resumedWithoutSandbox.status, 0, resumedWithoutSandbox.stderr);
+  assert.equal(resumedWithoutSandbox.status > 0, true);
+  assert.match(resumedWithoutSandbox.stderr, /was started with sandbox danger-full-access/);
+  assert.match(resumedWithoutSandbox.stderr, /asks for read-only/);
+  assert.match(resumedWithoutSandbox.stderr, /--fresh/);
   fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  assert.equal(fakeState.lastThreadResume.threadId, "thr_1");
-  assert.equal(fakeState.lastThreadResume.sandbox, "read-only");
+  assert.equal(fakeState.lastThreadResume.sandbox, "danger-full-access");
+  assert.equal(fakeState.lastTurnStart.prompt, "follow up");
+
+  const narrowedWithWrite = run("node", [SCRIPT, "task", "--resume", "--write", "apply the fix"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(narrowedWithWrite.status > 0, true);
+  assert.match(narrowedWithWrite.stderr, /asks for workspace-write/);
 });
 
 test("task-worker replays a stored request without a sandbox field using the --write mapping", () => {
@@ -1020,6 +1073,7 @@ test("task --background stores the sandbox in the job request so the detached wo
 
   assert.equal(resultPayload.storedJob.request.sandbox, "danger-full-access");
   assert.equal(resultPayload.storedJob.request.write, true);
+  assert.equal(resultPayload.job.sandbox, "danger-full-access");
 });
 
 test("task logs reasoning summaries and assistant messages to the job log", () => {

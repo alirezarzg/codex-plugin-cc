@@ -163,9 +163,9 @@ Ask Codex to redesign the database connection to be more resilient.
 - if you do not pass `--model` or `--effort`, Codex chooses its own defaults.
 - if you say `spark`, the plugin maps that to `gpt-5.3-codex-spark`
 - follow-up rescue requests can continue the latest Codex task in the repo
-- `--sandbox` applies to `/codex:rescue` only; `/codex:review` and `/codex:adversarial-review` stay read-only. It takes precedence over the rescue agent's default `--write`.
+- `--sandbox` applies to `/codex:rescue` only; `/codex:review` and `/codex:adversarial-review` stay read-only. It takes precedence over the rescue agent's default `--write`, and it counts only before the task text: the same words inside the text stay part of the prompt.
 - rescue runs edit files inside the repository by default (`workspace-write`). `--sandbox read-only` blocks edits, and `--sandbox danger-full-access` disables the Codex sandbox entirely, so Codex can write outside the repository and use the network without asking. Reserve it for tasks the sandbox blocks, such as running test tooling that writes to system locations.
-- a resumed thread keeps the sandbox it was started with while the plugin's shared app-server still holds it, which is the normal case inside one Claude Code session: Codex CLI 0.153.2 applies the sandbox named on `thread/resume` only when it loads the thread again from disk. Start a new thread with `--fresh` to change the sandbox.
+- a resumed thread keeps the sandbox it was started with while the plugin's shared app-server still holds it, which is the normal case inside one Claude Code session: Codex CLI 0.153.2 applies the sandbox named on `thread/resume` only when it loads the thread again from disk. So `task` refuses a resume that asks for a different sandbox than the thread has; resume with the same `--sandbox`, or start a new thread with `--fresh`.
 
 ### `/codex:transfer`
 
