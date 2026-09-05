@@ -158,7 +158,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(runtimeSkill, /If the forwarded request includes `--background` or `--wait`, treat that as Claude-side execution control only/i);
   assert.match(runtimeSkill, /Strip it before calling `task`/i);
   assert.match(runtimeSkill, /`--effort`: accepted values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`/i);
-  assert.match(runtimeSkill, /If the forwarded request starts with `--sandbox` \(before the task text\), pass it through to `task` in that position and do not add `--write`/i);
+  assert.match(runtimeSkill, /If the forwarded request carries `--sandbox` anywhere before the task text \(alongside `--model`, `--effort`, `--resume` or `--fresh`\), pass it through to `task` in that position and do not add `--write`/i);
   assert.match(runtimeSkill, /A `--sandbox` inside the task text is prompt text; leave it in place/i);
   assert.match(runtimeSkill, /`--sandbox`: accepted values are `read-only`, `workspace-write`, `danger-full-access`/i);
   assert.match(runtimeSkill, /It takes precedence over `--write`/i);
