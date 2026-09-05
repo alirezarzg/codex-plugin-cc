@@ -1039,6 +1039,59 @@ test("task --resume-last refuses a resume when the app-server reports a differen
   assert.equal(fakeState.lastTurnStart.prompt, "initial task");
 });
 
+test("task --resume-last does not infer the thread's sandbox from a job record without a sandbox field", () => {
+  const repo = makeTempDir();
+  const binDir = makeTempDir();
+  const statePath = path.join(binDir, "fake-codex-state.json");
+  installFakeCodex(binDir);
+  initGitRepo(repo);
+  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
+  run("git", ["add", "README.md"], { cwd: repo });
+  run("git", ["commit", "-m", "init"], { cwd: repo });
+
+  const firstRun = run("node", [SCRIPT, "task", "initial task"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+  assert.equal(firstRun.status, 0, firstRun.stderr);
+
+  const stateDir = resolveStateDir(repo);
+  const stateFile = path.join(stateDir, "state.json");
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+  for (const job of state.jobs) {
+    delete job.sandbox;
+    job.write = true;
+    const jobFile = path.join(stateDir, "jobs", `${job.id}.json`);
+    if (fs.existsSync(jobFile)) {
+      const stored = JSON.parse(fs.readFileSync(jobFile, "utf8"));
+      delete stored.sandbox;
+      stored.write = true;
+      fs.writeFileSync(jobFile, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
+    }
+  }
+  fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+
+  const readOnlyResume = run("node", [SCRIPT, "task", "--resume", "keep going"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(readOnlyResume.status, 0, readOnlyResume.stderr);
+  let fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadResume.threadId, "thr_1");
+  assert.equal(fakeState.lastTurnStart.prompt, "keep going");
+
+  const writeResume = run("node", [SCRIPT, "task", "--resume", "--write", "apply the fix"], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(writeResume.status > 0, true);
+  assert.match(writeResume.stderr, /still has sandbox read-only in the shared app-server/);
+  fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastTurnStart.prompt, "keep going");
+});
+
 test("task-worker replays a stored request without a sandbox field using the --write mapping", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();

@@ -202,14 +202,10 @@ function extractLeadingSandbox(argv) {
 }
 
 function threadStartSandbox(jobs, threadId) {
-  const onThread = jobs
-    .filter((job) => job.threadId === threadId)
+  const recorded = jobs
+    .filter((job) => job.threadId === threadId && VALID_SANDBOX_MODES.has(job.sandbox))
     .sort((left, right) => String(left.createdAt ?? "").localeCompare(String(right.createdAt ?? "")));
-  if (!onThread.length) {
-    return null;
-  }
-  const first = onThread[0];
-  return VALID_SANDBOX_MODES.has(first.sandbox) ? first.sandbox : defaultTaskSandbox(Boolean(first.write));
+  return recorded.length ? recorded[0].sandbox : null;
 }
 
 function normalizeArgv(argv) {
