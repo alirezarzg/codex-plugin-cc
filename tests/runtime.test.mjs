@@ -1087,7 +1087,9 @@ test("task --resume-last does not infer the thread's sandbox from a job record w
   });
 
   assert.equal(writeResume.status > 0, true);
-  assert.match(writeResume.stderr, /still has sandbox read-only in the shared app-server/);
+  assert.match(writeResume.stderr, /sandbox read-only/);
+  assert.match(writeResume.stderr, /asks for workspace-write/);
+  assert.match(writeResume.stderr, /--fresh/);
   fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
   assert.equal(fakeState.lastTurnStart.prompt, "keep going");
 });
