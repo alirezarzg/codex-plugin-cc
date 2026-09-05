@@ -70,9 +70,6 @@ const DEFAULT_STATUS_WAIT_TIMEOUT_MS = 240000;
 const DEFAULT_STATUS_POLL_INTERVAL_MS = 2000;
 const VALID_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 const VALID_SANDBOX_MODES = new Set(["read-only", "workspace-write", "danger-full-access"]);
-const TASK_VALUE_OPTIONS = ["model", "effort", "cwd", "prompt-file"];
-const TASK_BOOLEAN_OPTIONS = ["json", "write", "resume-last", "resume", "fresh", "background"];
-const TASK_SHORT_VALUE_OPTIONS = ["m", "C"];
 const MODEL_ALIASES = new Map([["spark", "gpt-5.3-codex-spark"]]);
 const STOP_REVIEW_TASK_MARKER = "Run a stop-gate review of the previous Claude turn.";
 
@@ -132,12 +129,12 @@ function normalizeReasoningEffort(effort) {
 }
 
 function normalizeSandboxMode(sandbox) {
-  if (sandbox == null) {
+  if (sandbox === undefined) {
     return null;
   }
   const normalized = String(sandbox).trim().toLowerCase();
   if (!normalized) {
-    return null;
+    throw new Error("Missing value for --sandbox. Use one of: read-only, workspace-write, danger-full-access.");
   }
   if (!VALID_SANDBOX_MODES.has(normalized)) {
     throw new Error(
@@ -149,63 +146,6 @@ function normalizeSandboxMode(sandbox) {
 
 function defaultTaskSandbox(write) {
   return write ? "workspace-write" : "read-only";
-}
-
-function extractLeadingSandbox(argv) {
-  const tokens = normalizeArgv(argv);
-  const rest = [];
-  let sandbox = null;
-  let leading = true;
-  let i = 0;
-  while (i < tokens.length) {
-    const token = tokens[i];
-    if (leading && token.startsWith("--") && token !== "--") {
-      const separator = token.indexOf("=");
-      const key = separator === -1 ? token.slice(2) : token.slice(2, separator);
-      const inlineValue = separator === -1 ? undefined : token.slice(separator + 1);
-      if (key === "sandbox") {
-        sandbox = inlineValue ?? tokens[i + 1] ?? "";
-        if (!String(sandbox).trim()) {
-          throw new Error("Missing value for --sandbox. Use one of: read-only, workspace-write, danger-full-access.");
-        }
-        i += inlineValue === undefined ? 2 : 1;
-        continue;
-      }
-      if (TASK_VALUE_OPTIONS.includes(key)) {
-        rest.push(token);
-        if (inlineValue === undefined && i + 1 < tokens.length) {
-          rest.push(tokens[i + 1]);
-        }
-        i += inlineValue === undefined ? 2 : 1;
-        continue;
-      }
-      if (TASK_BOOLEAN_OPTIONS.includes(key)) {
-        rest.push(token);
-        i += 1;
-        continue;
-      }
-      leading = false;
-    } else if (leading && token.startsWith("-") && token !== "-" && TASK_SHORT_VALUE_OPTIONS.includes(token.slice(1))) {
-      rest.push(token);
-      if (i + 1 < tokens.length) {
-        rest.push(tokens[i + 1]);
-      }
-      i += 2;
-      continue;
-    } else {
-      leading = false;
-    }
-    rest.push(token);
-    i += 1;
-  }
-  return { argv: rest, sandbox };
-}
-
-function threadStartSandbox(jobs, threadId) {
-  const recorded = jobs
-    .filter((job) => job.threadId === threadId && VALID_SANDBOX_MODES.has(job.sandbox))
-    .sort((left, right) => String(left.createdAt ?? "").localeCompare(String(right.createdAt ?? "")));
-  return recorded.length ? recorded[0].sandbox : null;
 }
 
 function normalizeArgv(argv) {
@@ -426,7 +366,7 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
 
   const trackedTask = findLatestResumableTaskJob(visibleJobs);
   if (trackedTask) {
-    return { id: trackedTask.threadId, sandbox: threadStartSandbox(jobs, trackedTask.threadId) };
+    return { id: trackedTask.threadId };
   }
 
   if (sessionId) {
@@ -557,13 +497,6 @@ async function executeTaskRun(request) {
       throw new Error("No previous Codex task thread was found for this repository.");
     }
     resumeThreadId = latestThread.id;
-    const requestedSandbox = request.sandbox ?? defaultTaskSandbox(Boolean(request.write));
-    if (latestThread.sandbox && latestThread.sandbox !== requestedSandbox) {
-      throw new Error(
-        `Thread ${latestThread.id} was started with sandbox ${latestThread.sandbox}, and a thread the shared app-server still holds keeps it on resume. ` +
-          `This request asks for ${requestedSandbox}. Resume with --sandbox ${latestThread.sandbox}, or start a fresh thread with --fresh.`
-      );
-    }
   }
 
   if (!request.prompt && !resumeThreadId) {
@@ -652,7 +585,7 @@ function getJobKindLabel(kind, jobClass) {
   return jobClass === "review" ? "review" : "rescue";
 }
 
-function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summary, write = false, sandbox = null }) {
+function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summary, write = false }) {
   return createJobRecord({
     id: generateJobId(prefix),
     kind,
@@ -661,8 +594,7 @@ function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summ
     workspaceRoot,
     jobClass,
     summary,
-    write,
-    ...(sandbox ? { sandbox } : {})
+    write
   });
 }
 
@@ -678,7 +610,7 @@ function createTrackedProgress(job, options = {}) {
   };
 }
 
-function buildTaskJob(workspaceRoot, taskMetadata, write, sandbox) {
+function buildTaskJob(workspaceRoot, taskMetadata, write) {
   return createCompanionJob({
     prefix: "task",
     kind: "task",
@@ -686,8 +618,7 @@ function buildTaskJob(workspaceRoot, taskMetadata, write, sandbox) {
     workspaceRoot,
     jobClass: "task",
     summary: taskMetadata.summary,
-    write,
-    sandbox
+    write
   });
 }
 
@@ -851,12 +782,11 @@ async function handleReview(argv) {
 }
 
 async function handleTask(argv) {
-  const leading = extractLeadingSandbox(argv);
-  const { options, positionals } = parseArgs(leading.argv, {
-    valueOptions: TASK_VALUE_OPTIONS,
-    booleanOptions: TASK_BOOLEAN_OPTIONS,
+  const { options, positionals } = parseCommandInput(argv, {
+    valueOptions: ["model", "effort", "cwd", "prompt-file", "sandbox"],
+    booleanOptions: ["json", "write", "resume-last", "resume", "fresh", "background"],
+    leadingOnlyOptions: ["sandbox"],
     aliasMap: {
-      C: "cwd",
       m: "model"
     }
   });
@@ -872,7 +802,7 @@ async function handleTask(argv) {
   if (resumeLast && fresh) {
     throw new Error("Choose either --resume/--resume-last or --fresh.");
   }
-  const sandbox = normalizeSandboxMode(leading.sandbox) ?? defaultTaskSandbox(Boolean(options.write));
+  const sandbox = normalizeSandboxMode(options.sandbox) ?? defaultTaskSandbox(Boolean(options.write));
   const write = sandbox !== "read-only";
   const taskMetadata = buildTaskRunMetadata({
     prompt,
@@ -883,7 +813,7 @@ async function handleTask(argv) {
     ensureCodexAvailable(cwd);
     requireTaskRequest(prompt, resumeLast);
 
-    const job = buildTaskJob(workspaceRoot, taskMetadata, write, sandbox);
+    const job = buildTaskJob(workspaceRoot, taskMetadata, write);
     const request = buildTaskRequest({
       cwd,
       model,
@@ -899,7 +829,7 @@ async function handleTask(argv) {
     return;
   }
 
-  const job = buildTaskJob(workspaceRoot, taskMetadata, write, sandbox);
+  const job = buildTaskJob(workspaceRoot, taskMetadata, write);
   await runForegroundCommand(
     job,
     (progress) =>

@@ -945,7 +945,7 @@ test("task --sandbox rejects unknown modes and takes precedence over --write", (
   assert.equal(fakeState.lastTurnStart.prompt, "fix the failing test");
 });
 
-test("task --resume-last keeps the sandbox of the thread and refuses another one", () => {
+test("task --resume-last refuses a sandbox the app-server does not grant the resumed thread", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
   const statePath = path.join(binDir, "fake-codex-state.json");
@@ -978,11 +978,11 @@ test("task --resume-last keeps the sandbox of the thread and refuses another one
   });
 
   assert.equal(resumedWithoutSandbox.status > 0, true);
-  assert.match(resumedWithoutSandbox.stderr, /was started with sandbox danger-full-access/);
-  assert.match(resumedWithoutSandbox.stderr, /asks for read-only/);
+  assert.match(resumedWithoutSandbox.stderr, /still has sandbox danger-full-access in the shared app-server/);
+  assert.match(resumedWithoutSandbox.stderr, /would not run read-only/);
   assert.match(resumedWithoutSandbox.stderr, /--fresh/);
   fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  assert.equal(fakeState.lastThreadResume.sandbox, "danger-full-access");
+  assert.equal(fakeState.lastThreadResume.sandbox, "read-only");
   assert.equal(fakeState.lastTurnStart.prompt, "follow up");
 
   const narrowedWithWrite = run("node", [SCRIPT, "task", "--resume", "--write", "apply the fix"], {
@@ -991,107 +991,9 @@ test("task --resume-last keeps the sandbox of the thread and refuses another one
   });
 
   assert.equal(narrowedWithWrite.status > 0, true);
-  assert.match(narrowedWithWrite.stderr, /asks for workspace-write/);
-});
-
-test("task --resume-last refuses a resume when the app-server reports a different sandbox than requested", () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  const statePath = path.join(binDir, "fake-codex-state.json");
-  installFakeCodex(binDir);
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-
-  const firstRun = run("node", [SCRIPT, "task", "--sandbox", "danger-full-access", "initial task"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-  assert.equal(firstRun.status, 0, firstRun.stderr);
-
-  const stateDir = resolveStateDir(repo);
-  const stateFile = path.join(stateDir, "state.json");
-  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-  for (const job of state.jobs) {
-    delete job.sandbox;
-    job.write = false;
-    const jobFile = path.join(stateDir, "jobs", `${job.id}.json`);
-    if (fs.existsSync(jobFile)) {
-      const stored = JSON.parse(fs.readFileSync(jobFile, "utf8"));
-      delete stored.sandbox;
-      stored.write = false;
-      fs.writeFileSync(jobFile, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
-    }
-  }
-  fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-
-  const resumed = run("node", [SCRIPT, "task", "--resume", "--sandbox", "read-only", "follow up"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-
-  assert.equal(resumed.status > 0, true);
-  assert.match(resumed.stderr, /still has sandbox danger-full-access in the shared app-server/);
-  assert.match(resumed.stderr, /--fresh/);
-  const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  assert.equal(fakeState.lastThreadResume.sandbox, "read-only");
-  assert.equal(fakeState.lastTurnStart.prompt, "initial task");
-});
-
-test("task --resume-last does not infer the thread's sandbox from a job record without a sandbox field", () => {
-  const repo = makeTempDir();
-  const binDir = makeTempDir();
-  const statePath = path.join(binDir, "fake-codex-state.json");
-  installFakeCodex(binDir);
-  initGitRepo(repo);
-  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
-  run("git", ["add", "README.md"], { cwd: repo });
-  run("git", ["commit", "-m", "init"], { cwd: repo });
-
-  const firstRun = run("node", [SCRIPT, "task", "initial task"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-  assert.equal(firstRun.status, 0, firstRun.stderr);
-
-  const stateDir = resolveStateDir(repo);
-  const stateFile = path.join(stateDir, "state.json");
-  const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
-  for (const job of state.jobs) {
-    delete job.sandbox;
-    job.write = true;
-    const jobFile = path.join(stateDir, "jobs", `${job.id}.json`);
-    if (fs.existsSync(jobFile)) {
-      const stored = JSON.parse(fs.readFileSync(jobFile, "utf8"));
-      delete stored.sandbox;
-      stored.write = true;
-      fs.writeFileSync(jobFile, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
-    }
-  }
-  fs.writeFileSync(stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-
-  const readOnlyResume = run("node", [SCRIPT, "task", "--resume", "keep going"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-
-  assert.equal(readOnlyResume.status, 0, readOnlyResume.stderr);
-  let fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  assert.equal(fakeState.lastThreadResume.threadId, "thr_1");
-  assert.equal(fakeState.lastTurnStart.prompt, "keep going");
-
-  const writeResume = run("node", [SCRIPT, "task", "--resume", "--write", "apply the fix"], {
-    cwd: repo,
-    env: buildEnv(binDir)
-  });
-
-  assert.equal(writeResume.status > 0, true);
-  assert.match(writeResume.stderr, /sandbox read-only/);
-  assert.match(writeResume.stderr, /asks for workspace-write/);
-  assert.match(writeResume.stderr, /--fresh/);
+  assert.match(narrowedWithWrite.stderr, /would not run workspace-write/);
   fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  assert.equal(fakeState.lastTurnStart.prompt, "keep going");
+  assert.equal(fakeState.lastTurnStart.prompt, "follow up");
 });
 
 test("task-worker replays a stored request without a sandbox field using the --write mapping", () => {
@@ -1201,7 +1103,6 @@ test("task --background stores the sandbox in the job request so the detached wo
 
   assert.equal(resultPayload.storedJob.request.sandbox, "danger-full-access");
   assert.equal(resultPayload.storedJob.request.write, true);
-  assert.equal(resultPayload.job.sandbox, "danger-full-access");
 });
 
 test("task logs reasoning summaries and assistant messages to the job log", () => {
