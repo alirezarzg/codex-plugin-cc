@@ -911,6 +911,16 @@ test("task --sandbox rejects unknown modes and takes precedence over --write", (
   assert.equal(suffixed.status > 0, true);
   assert.match(suffixed.stderr, /Unsupported sandbox mode "danger-full-access=false"/);
 
+  for (const argv of [["--sandbox=", "diagnose the failing test"], ["--resume", "--sandbox"]]) {
+    const empty = run("node", [SCRIPT, "task", ...argv], {
+      cwd: repo,
+      env: buildEnv(binDir)
+    });
+
+    assert.equal(empty.status > 0, true, argv.join(" "));
+    assert.match(empty.stderr, /Missing value for --sandbox/);
+  }
+
   const threads = fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath, "utf8")).threads : [];
   assert.equal(threads.length, 0);
 

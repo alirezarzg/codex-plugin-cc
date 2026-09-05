@@ -165,6 +165,9 @@ function extractLeadingSandbox(argv) {
       const inlineValue = separator === -1 ? undefined : token.slice(separator + 1);
       if (key === "sandbox") {
         sandbox = inlineValue ?? tokens[i + 1] ?? "";
+        if (!String(sandbox).trim()) {
+          throw new Error("Missing value for --sandbox. Use one of: read-only, workspace-write, danger-full-access.");
+        }
         i += inlineValue === undefined ? 2 : 1;
         continue;
       }
