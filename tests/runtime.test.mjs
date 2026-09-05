@@ -873,7 +873,7 @@ test("task --sandbox rejects unknown modes and a read-only sandbox combined with
   assert.equal(threads.length, 0);
 });
 
-test("task --resume-last applies the sandbox of the new request to thread/resume", () => {
+test("task --resume-last forwards the sandbox of the new request on thread/resume", () => {
   const repo = makeTempDir();
   const binDir = makeTempDir();
   const statePath = path.join(binDir, "fake-codex-state.json");
@@ -909,6 +909,62 @@ test("task --resume-last applies the sandbox of the new request to thread/resume
   fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
   assert.equal(fakeState.lastThreadResume.threadId, "thr_1");
   assert.equal(fakeState.lastThreadResume.sandbox, "read-only");
+});
+
+test("task-worker replays a stored request without a sandbox field using the --write mapping", () => {
+  const repo = makeTempDir();
+  const binDir = makeTempDir();
+  const statePath = path.join(binDir, "fake-codex-state.json");
+  installFakeCodex(binDir);
+  initGitRepo(repo);
+  fs.writeFileSync(path.join(repo, "README.md"), "hello\n");
+  run("git", ["add", "README.md"], { cwd: repo });
+  run("git", ["commit", "-m", "init"], { cwd: repo });
+
+  const jobsDir = path.join(resolveStateDir(repo), "jobs");
+  fs.mkdirSync(jobsDir, { recursive: true });
+  const jobId = "task-legacy";
+  fs.writeFileSync(
+    path.join(jobsDir, `${jobId}.json`),
+    `${JSON.stringify(
+      {
+        id: jobId,
+        kind: "task",
+        kindLabel: "task",
+        status: "queued",
+        phase: "queued",
+        title: "Codex Task",
+        jobClass: "task",
+        summary: "fix the failing test",
+        workspaceRoot: repo,
+        write: true,
+        createdAt: "2026-03-18T15:30:00.000Z",
+        updatedAt: "2026-03-18T15:30:00.000Z",
+        request: {
+          cwd: repo,
+          model: null,
+          effort: null,
+          prompt: "fix the failing test",
+          write: true,
+          resumeLast: false,
+          jobId
+        }
+      },
+      null,
+      2
+    )}\n`,
+    "utf8"
+  );
+
+  const result = run("node", [SCRIPT, "task-worker", "--cwd", repo, "--job-id", jobId], {
+    cwd: repo,
+    env: buildEnv(binDir)
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const fakeState = JSON.parse(fs.readFileSync(statePath, "utf8"));
+  assert.equal(fakeState.lastThreadStart.sandbox, "workspace-write");
+  assert.equal(fakeState.lastTurnStart.prompt, "fix the failing test");
 });
 
 test("task --background stores the sandbox in the job request so the detached worker reuses it", async () => {

@@ -166,6 +166,7 @@ test("rescue command absorbs continue semantics", () => {
   assert.match(readme, /continue a previous Codex task/i);
   assert.match(readme, /--sandbox <read-only\|workspace-write\|danger-full-access>/);
   assert.match(readme, /`--sandbox danger-full-access` disables the Codex sandbox entirely/i);
+  assert.match(readme, /a resumed thread keeps the sandbox it was started with/i);
   assert.match(readme, /### `\/codex:setup`/);
   assert.match(readme, /### `\/codex:review`/);
   assert.match(readme, /### `\/codex:adversarial-review`/);

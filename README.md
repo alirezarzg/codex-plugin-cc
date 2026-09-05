@@ -164,7 +164,7 @@ Ask Codex to redesign the database connection to be more resilient.
 - if you say `spark`, the plugin maps that to `gpt-5.3-codex-spark`
 - follow-up rescue requests can continue the latest Codex task in the repo
 - rescue runs edit files inside the repository by default (`workspace-write`). `--sandbox read-only` blocks edits, and `--sandbox danger-full-access` disables the Codex sandbox entirely, so Codex can write outside the repository and use the network without asking. Reserve it for tasks the sandbox blocks, such as running test tooling that writes to system locations.
-- the sandbox applies to the run you start. A resumed thread uses the sandbox of the new request, not the one it had before.
+- a resumed thread keeps the sandbox it was started with. Passing `--sandbox` or `--write` together with `--resume` does not change it on current Codex releases (checked with 0.153.2). Start a new thread with `--fresh` to change the sandbox.
 
 ### `/codex:transfer`
 
